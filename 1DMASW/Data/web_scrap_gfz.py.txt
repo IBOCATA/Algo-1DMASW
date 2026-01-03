@@ -1,0 +1,48 @@
+import requests
+import xmltodict
+import psycopg2
+
+def fetch_geofon_events(limit=10):
+    url = f"https://geofon.gfz-potsdam.de/eqinfo/list.php?fmt=xml&n={limit}"
+    resp = requests.get(url)
+    data = xmltodict.parse(resp.content)
+    return data["eventParameters"]["event"]
+
+def save_to_db(events):
+    conn = psycopg2.connect(
+        dbname="geofon_data",
+        user="postgres",
+        password="postgres",
+        host="localhost",
+        port=5432
+    )
+    cur = conn.cursor()
+
+    for ev in events:
+        evid = ev["@publicID"]
+        origin = ev["origin"]
+        mag = ev["magnitude"]
+
+        event_time = origin["time"]["value"]
+        lat = origin["latitude"]["value"]
+        lon = origin["longitude"]["value"]
+        depth = origin["depth"]["value"]
+        mag_val = mag["mag"]["value"]
+        region = ev.get("description", {}).get("text", "N/A")
+
+        cur.execute("""
+            INSERT INTO events (event_id, time, latitude, longitude, depth, magnitude, region, raw_url)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (event_id) DO NOTHING;
+        """, (
+            evid, event_time, lat, lon, depth, mag_val, region, evid
+        ))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+if __name__ == "__main__":
+    events = fetch_geofon_events(limit=50)
+    save_to_db(events)
+    print("✅ Events imported into Postgres/PostGIS")

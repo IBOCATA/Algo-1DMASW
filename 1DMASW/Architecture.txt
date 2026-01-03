@@ -1,0 +1,10 @@
+1dmasw/
+├── backend/
+│   ├── main.py
+│   ├── tasks.py
+│   ├── inversion/
+│   └── tests/               👈 Create this directory
+│       ├── __init__.py
+│       ├── test_auth.py     👈 Auth route tests
+│       ├── test_routes.py   👈 Upload and secure route tests
+│       └── test_tasks.py    👈 Celery and inversion tests

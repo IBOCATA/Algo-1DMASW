@@ -1,0 +1,12 @@
+FROM ubuntu:22.04
+
+# Installer Python et Madagascar
+RUN apt-get update && apt-get install -y python3 python3-pip redis-server \
+    madagascar build-essential && \
+    pip3 install celery redis
+
+WORKDIR /app
+COPY backend/ /app/
+
+CMD ["celery", "-A", "tasks", "worker", "--loglevel=info"]
+RUN apt-get update && apt-get install -y madagascar

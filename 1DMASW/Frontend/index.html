@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>1DMASW – Seismic Cloud</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0f15; --panel:#0f141c; --glass:#0d1117cc; --text:#e6edf3; --muted:#9aa5b1;
+    --border:#263041; --pri:#34d399; --pri-2:#60a5fa; --warn:#fbbf24; --err:#f87171;
+    --ok:#10b981; --chip:#111827; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:Inter,ui-sans-serif,Segoe UI,Roboto,Arial; color:var(--text);
+       background:radial-gradient(1200px 600px at 20% -10%,#0a1222 0%,#0b0f15 50%);
+  }
+  header{
+    position:sticky; top:0; z-index:10; backdrop-filter:saturate(120%) blur(6px);
+    background:var(--glass); border-bottom:1px solid var(--border);
+  }
+  .wrap{max-width:1200px; margin:0 auto; padding:14px 18px; display:flex; align-items:center; gap:14px}
+  .logo{width:36px; height:36px; border-radius:10px; display:grid; place-items:center;
+        background:linear-gradient(135deg,var(--pri),var(--pri-2)); color:#0a0f14; font-weight:900}
+  h1{margin:0; font-size:18px; letter-spacing:.3px}
+  main{max-width:1200px; margin:18px auto; padding:0 18px; display:grid; gap:18px}
+  .grid{display:grid; gap:18px}
+  @media(min-width:1080px){ .grid{grid-template-columns: 360px 1fr} }
+  .card{background:linear-gradient(180deg,var(--panel),#0b1018); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:var(--shadow)}
+  h2{margin:0 0 10px 0; font-size:18px}
+  p.muted{margin:6px 0 12px 0; color:var(--muted); font-size:13px}
+  .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+  .btn{appearance:none; background:#0f1622; color:var(--text); border:1px solid var(--border);
+       padding:10px 14px; border-radius:11px; font-weight:600; cursor:pointer; transition:.15s}
+  .btn:hover{transform:translateY(-1px)}
+  .btn.pri{background:linear-gradient(45deg,#34d399,#10b981); color:#05130f; border-color:#0ea371}
+  .btn.alt{background:linear-gradient(45deg,#60a5fa,#3b82f6); border-color:#2563eb}
+  .btn.ghost{background:transparent}
+  .btn.warn{background:#2b1e04; border-color:#4d3a0b; color:#ffd98a}
+  input[type=text],input[type=password]{width:100%; background:#0b1016; color:var(--text); border:1px solid var(--border); border-radius:10px; padding:10px 12px}
+  .chip{background:var(--chip); border:1px solid var(--border); padding:6px 10px; border-radius:999px; color:var(--muted); font-size:12px}
+  .code{font-family:ui-monospace,Consolas,Menlo,monospace; color:#9fb4ff; font-size:12px; word-break:break-all}
+  .hr{height:1px; background:linear-gradient(90deg,transparent,#213144,transparent); margin:12px 0}
+  .drop{border:1.5px dashed #334255; border-radius:12px; padding:14px; display:grid; place-items:center; text-align:center; color:var(--muted)}
+  .drop.highlight{border-color:#34d399; color:#34d399}
+  .progress{height:10px; background:#0b1118; border:1px solid var(--border); border-radius:999px; overflow:hidden}
+  .progress>span{display:block; height:100%; width:0%; background:linear-gradient(90deg,#34d399,#60a5fa)}
+  .status{display:flex; gap:8px; align-items:center; font-variant-numeric:tabular-nums}
+  .timeline{display:grid; gap:8px}
+  .step{display:flex; gap:10px; align-items:center}
+  .dot{width:10px; height:10px; border-radius:50%; background:#334255}
+  .step.done .dot{background:var(--ok)} .step.run .dot{background:#60a5fa} .step.err .dot{background:var(--err)}
+  #plot2d,#plot3d{width:100%; height:430px}
+  #chart1d{width:100%; height:300px}
+  .skeleton{animation: shimmer 1.2s infinite; background:
+    linear-gradient(90deg,#0c1117 0%,#101722 50%,#0c1117 100%); border-radius:10px}
+  @keyframes shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+  .exports{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px}
+  @media(max-width:760px){ .exports{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .toast{position:fixed; right:16px; bottom:16px; min-width:220px; background:#0b1118; border:1px solid var(--border);
+         padding:10px 14px; border-radius:12px; display:none; box-shadow:var(--shadow)}
+  footer{opacity:.75; font-size:12px; text-align:center; padding:24px}
+  .tabs{display:flex; gap:8px; margin:-6px 0 10px 0}
+  .tabs .btn[aria-selected="true"]{outline:2px solid #2a3b52}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="logo">1D</div><h1>1DMASW – Cloud Seismic</h1>
+    <span class="chip">FastAPI</span><span class="chip">Celery</span><span class="chip">Plotly + Chart.js</span>
+    <span class="chip" id="backendState">API: <span class="code">not checked</span></span>
+  </div>
+</header>
+
+<main class="grid">
+  <!-- LEFT: data, auth, payments -->
+  <section class="card" id="panel-left">
+    <h2>Data & Jobs</h2>
+    <p class="muted">Glissez-déposez un fichier SEG‑Y ou cliquez pour choisir. Démarrez le traitement asynchrone, puis suivez la progression.</p>
+
+    <div id="drop" class="drop">
+      <div>
+        <strong>Déposer un fichier SEG‑Y ici</strong><br/>
+        <small>ou cliquer pour sélectionner</small>
+      </div>
+      <input id="fileInput" type="file" accept=".sgy,.segy,.SEG,.dat,.bin" hidden>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button class="btn pri" id="btnUpload">Upload & Lancer</button>
+      <button class="btn ghost" id="btnClear">Réinitialiser</button>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="status">
+      <span class="chip">Job ID</span><span id="jobId" class="code">—</span>
+    </div>
+    <div class="progress" style="margin:10px 0"><span id="bar"></span></div>
+    <div class="row">
+      <button class="btn" id="btnPoll">Actualiser</button>
+      <button class="btn alt" id="btnAuto">Auto‑poll</button>
+      <span class="chip">Statut: <b id="jobStatus">idle</b></span>
+    </div>
+
+    <div class="timeline" style="margin-top:12px">
+      <div class="step" id="st-queued"><span class="dot"></span><span>1. Ajout en file d’attente</span></div>
+      <div class="step" id="st-running"><span class="dot"></span><span>2. Traitement Celery</span></div>
+      <div class="step" id="st-finished"><span class="dot"></span><span>3. Terminé</span></div>
+      <div class="step" id="st-failed"><span class="dot"></span><span>4. Erreur</span></div>
+    </div>
+
+    <div class="hr"></div>
+    <h2>Authentification</h2>
+    <div class="row" style="flex-direction:column; align-items:stretch; gap:8px">
+      <input id="user" type="text" placeholder="username" />
+      <input id="pass" type="password" placeholder="password" />
+      <button class="btn alt" id="btnLogin">Obtenir un token</button>
+      <div class="row"><span class="chip">Token</span> <span id="tok" class="code">—</span></div>
+    </div>
+
+    <div class="hr"></div>
+    <h2>Crédits & Factures</h2>
+    <p class="muted">Acheter des crédits de calcul (Stripe ou PayPal) et télécharger vos factures.</p>
+    <div class="row">
+      <button class="btn pri" id="btnStripe">Stripe</button>
+      <button class="btn alt" id="btnPayPal">PayPal</button>
+    </div>
+    <div class="row" style="margin-top:8px; gap:6px">
+      <input id="invoiceId" type="text" placeholder="Invoice ID (ex: INV001)" />
+      <button class="btn" id="btnInvoice">Télécharger PDF</button>
+    </div>
+  </section>
+
+  <!-- RIGHT: tabs + visualizations + exports -->
+  <section class="grid">
+    <div class="card">
+      <div class="tabs" role="tablist" aria-label="Visualisations">
+        <button class="btn" role="tab" aria-selected="true" id="tab1d">1D</button>
+        <button class="btn" role="tab" aria-selected="false" id="tab2d">2D FWI</button>
+        <button class="btn" role="tab" aria-selected="false" id="tab3d">3D Volume</button>
+      </div>
+
+      <!-- 1D -->
+      <div id="view1d">
+        <p class="muted">Profil Vs (m/s) en fonction de la profondeur (m).</p>
+        <div class="row">
+          <button class="btn" id="btn1D">Charger 1D</button>
+        </div>
+        <div id="skel1d" class="skeleton" style="height:260px; display:none"></div>
+        <canvas id="chart1d"></canvas>
+      </div>
+
+      <!-- 2D -->
+      <div id="view2d" style="display:none">
+        <p class="muted">Modèle de vitesse issu de l’inversion FWI 2D.</p>
+        <div class="row">
+          <button class="btn" id="btn2D">Charger 2D</button>
+        </div>
+        <div id="skel2d" class="skeleton" style="height:380px; display:none"></div>
+        <div id="plot2d"></div>
+      </div>
+
+      <!-- 3D -->
+      <div id="view3d" style="display:none">
+        <p class="muted">Visualisation interactive du volume 3D.</p>
+        <div class="row">
+          <button class="btn" id="btn3D">Charger 3D</button>
+        </div>
+        <div id="skel3d" class="skeleton" style="height:380px; display:none"></div>
+        <div id="plot3d"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Exports</h2>
+      <p class="muted">Récupérer les résultats pour QGIS, Leapfrog, Oasis Montaj.</p>
+      <div class="exports">
+        <button class="btn" data-format="csv">CSV (1D)</button>
+        <button class="btn" data-format="xyz">XYZ (3D)</button>
+        <button class="btn" data-format="vtk">VTK (3D)</button>
+        <button class="btn" data-format="tif">GeoTIFF (2D)</button>
+      </div>
+      <p class="muted" style="margin-top:8px">Astuce : lancez l’export quand le job est <span class="code">completed</span>.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  © 2025 1DMASW • Frontend UX • <span class="muted">Configurez <span class="code">API_BASE</span> ci‑dessous pour pointer sur votre API.</span>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================
+   CONFIG – change me
+========================= */
+const API_BASE = ""; // e.g. "https://api.1dmasw.your-domain.com"
+const endpoints = {
+  health:           () => `${API_BASE}/health`,
+
+  token:            () => `${API_BASE}/token`,
+  upload:           () => `${API_BASE}/upload`,                // POST form-data file
+  jobStatus:        (id) => `${API_BASE}/jobs/${encodeURIComponent(id)}`,
+
+  viz1D:            (id) => `${API_BASE}/visualize/1d_shear${id?`?job_id=${encodeURIComponent(id)}`:""}`,
+  viz2D:            (id) => `${API_BASE}/visualize/2d_fwi${id?`?job_id=${encodeURIComponent(id)}`:""}`,
+  viz3D:            (id) => `${API_BASE}/visualize/3d_volume${id?`?job_id=${encodeURIComponent(id)}`:""}`,
+
+  export:           (fmt, id) => `${API_BASE}/export?format=${encodeURIComponent(fmt)}${id?`&job_id=${encodeURIComponent(id)}`:""}`,
+
+  stripe:           () => `${API_BASE}/create-stripe-session`,
+  paypal:           () => `${API_BASE}/create-paypal-session`,
+  invoice:          (id) => `${API_BASE}/invoice/${encodeURIComponent(id)}`
+};
+
+let token = null;
+let jobId = null;
+let auto = false;
+let timer = null;
+let chart1d = null;
+
+/* =========================
+   Helpers
+========================= */
+const $  = (s)=>document.querySelector(s);
+const $$ = (s)=>document.querySelectorAll(s);
+const toast=(m,type="info")=>{
+  const t=$("#toast"); t.textContent=m; t.style.display="block";
+  t.style.borderColor= type==="error" ? "var(--err)" : type==="warn" ? "var(--warn)" : "var(--border)";
+  setTimeout(()=>t.style.display="none",3000);
+};
+const hdr=(extra={})=> token ? ({...extra, "Authorization":`Bearer ${token}`}): extra;
+const setSteps=(state)=>{
+  // reset
+  ["queued","running","finished","failed"].forEach(k => $(`#st-${k}`).className="step");
+  if(state==="queued")   $("#st-queued").classList.add("run");
+  if(state==="running")  {$("#st-queued").classList.add("done"); $("#st-running").classList.add("run");}
+  if(state==="completed"){$("#st-queued").classList.add("done"); $("#st-running").classList.add("done"); $("#st-finished").classList.add("done");}
+  if(state==="failed")   $("#st-failed").classList.add("err");
+};
+
+/* =========================
+   Header health check
+========================= */
+(async()=>{
+  try{
+    const res = await fetch(endpoints.health());
+    $("#backendState .code").textContent = res.ok ? "online ✅" : "unreachable";
+  }catch{ $("#backendState .code").textContent = "unreachable"; }
+})();
+
+/* =========================
+   Auth
+========================= */
+$("#btnLogin").addEventListener("click", async ()=>{
+  const u=$("#user").value.trim(), p=$("#pass").value.trim();
+  if(!u||!p) return toast("Renseignez identifiants.", "warn");
+  const body = new URLSearchParams({ username:u, password:p });
+  try{
+    const res = await fetch(endpoints.token(), { method:"POST", headers:{ "Content-Type":"application/x-www-form-urlencoded" }, body });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail||JSON.stringify(data));
+    token = data.access_token || data.token;
+    $("#tok").textContent = token || "—";
+    toast("Token obtenu.");
+  }catch(e){ console.error(e); toast("Échec auth.", "error"); }
+});
+
+/* =========================
+   Drag & Drop + Upload
+========================= */
+const drop = $("#drop"), fileInput=$("#fileInput");
+drop.addEventListener("click", ()=> fileInput.click());
+["dragenter","dragover"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.add("highlight"); }));
+["dragleave","drop"].forEach(ev=> drop.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); drop.classList.remove("highlight"); }));
+drop.addEventListener("drop", e=>{
+  const dt=e.dataTransfer; if(dt?.files?.length){ fileInput.files=dt.files; toast(`${dt.files[0].name} prêt.`); }
+});
+
+$("#btnClear").addEventListener("click", ()=>{
+  fileInput.value=""; jobId=null; $("#jobId").textContent="—"; $("#jobStatus").textContent="idle"; $("#bar").style.width="0%"; setSteps(null);
+});
+
+/* Upload & start job */
+$("#btnUpload").addEventListener("click", async ()=>{
+  const f = fileInput.files?.[0];
+  if(!f) return toast("Choisissez un fichier SEG‑Y.", "warn");
+  const fd = new FormData(); fd.append("file", f);
+  try{
+    const res = await fetch(endpoints.upload(), { method:"POST", headers:hdr(), body:fd });
+    const data = await res.json();
+    if(!res.ok || (data.status && data.status!=="ok")) throw new Error(data.message||JSON.stringify(data));
+    jobId = data.job_id || data.id || data.task_id;
+    $("#jobId").textContent = jobId || "—";
+    $("#jobStatus").textContent="queued"; $("#bar").style.width="8%"; setSteps("queued");
+    toast("Upload OK. Job lancé.");
+  }catch(e){ console.error(e); toast("Upload/job échec", "error"); setSteps("failed"); }
+});
+
+/* =========================
+   Job polling
+========================= */
+async function poll(){
+  if(!jobId) return toast("Aucun Job ID.", "warn");
+  try{
+    const res = await fetch(endpoints.jobStatus(jobId), { headers:hdr() });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.detail||JSON.stringify(data));
+    const status = (data.status||"unknown").toLowerCase();
+    const pct = Math.max(0, Math.min(100, Number(data.progress ?? (status==="completed"?100: (status==="running"?50:10)))));
+    $("#jobStatus").textContent = `${status}${data.progress!=null?` (${data.progress}%)`:""}`;
+    $("#bar").style.width = pct+"%";
+    if(status.includes("queued")) setSteps("queued");
+    else if(status.includes("running")) setSteps("running");
+    else if(status.includes("completed")) { setSteps("completed"); if(auto) toggleAuto(false); toast("Traitement terminé 🎉"); }
+    else if(status.includes("failed")||status.includes("error")) { setSteps("failed"); if(auto) toggleAuto(false); toast("Job en erreur", "error"); }
+  }catch(e){ console.error(e); toast("Erreur statut job.", "error"); }
+}
+$("#btnPoll").addEventListener("click", poll);
+function toggleAuto(force){
+  auto = (typeof force==="boolean") ? force : !auto;
+  $("#btnAuto").textContent = auto ? "Stop Auto‑poll" : "Auto‑poll";
+  clearInterval(timer);
+  if(auto){ poll(); timer=setInterval(poll, 3000); }
+}
+$("#btnAuto").addEventListener("click", ()=> toggleAuto());
+
+/* =========================
+   Tabs
+========================= */
+const tabs = [{btn:"#tab1d", view:"#view1d"}, {btn:"#tab2d", view:"#view2d"}, {btn:"#tab3d", view:"#view3d"}];
+tabs.forEach((t,i)=>{
+  $(t.btn).addEventListener("click", ()=>{
+    tabs.forEach((x,j)=>{ $(x.btn).setAttribute("aria-selected", String(i===j)); $(x.view).style.display = i===j ? "block" : "none"; });
+  });
+});
+
+/* =========================
+   Visualizations
+========================= */
+// 1D
+$("#btn1D").addEventListener("click", async ()=>{
+  $("#skel1d").style.display="block";
+  try{
+    const res = await fetch(endpoints.viz1D(jobId), { headers:hdr() });
+    const data = await res.json(); if(!res.ok) throw new Error(data.detail||JSON.stringify(data));
+    const ctx = $("#chart1d").getContext("2d");
+    chart1d?.destroy();
+    chart1d = new Chart(ctx, {
+      type:'line',
+      data:{ labels:data.depth, datasets:[{label:'Vs (m/s)', data:data.velocity, borderColor:'#34d399', fill:false}] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        scales:{ y:{ reverse:true, title:{display:true, text:'Depth (m)'} }, x:{ title:{display:true, text:'Velocity (m/s)'} } }
+      }
+    });
+    toast("Profil 1D chargé.");
+  }catch(e){ console.error(e); toast("Échec chargement 1D", "error"); }
+  finally{ $("#skel1d").style.display="none"; }
+});
+
+// 2D
+$("#btn2D").addEventListener("click", async ()=>{
+  $("#skel2d").style.display="block";
+  try{
+    const res = await fetch(endpoints.viz2D(jobId), { headers:hdr() });
+    const dat = await res.json(); if(!res.ok) throw new Error(dat.detail||JSON.stringify(dat));
+    Plotly.newPlot("plot2d", [{ z:dat.velocity, type:'heatmap', colorscale:'Viridis'}],
+      { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', margin:{t:36,r:10,b:36,l:50}, title:'2D FWI Velocity' },
+      { responsive:true, displayModeBar:true }
+    );
+    toast("FWI 2D chargé.");
+  }catch(e){ console.error(e); toast("Échec chargement 2D", "error"); }
+  finally{ $("#skel2d").style.display="none"; }
+});
+
+// 3D
+$("#btn3D").addEventListener("click", async ()=>{
+  $("#skel3d").style.display="block";
+  try{
+    const res = await fetch(endpoints.viz3D(jobId), { headers:hdr() });
+    const d = await res.json(); if(!res.ok) throw new Error(d.detail||JSON.stringify(d));
+    const v = d.velocity||[];
+    Plotly.newPlot("plot3d", [{
+      type:'volume', x:d.x, y:d.y, z:d.z, value:v,
+      isomin:Math.min(...v), isomax:Math.max(...v), opacity:.08, surface:{count:24}, colorscale:'Jet', caps:{x:false,y:false,z:false}
+    }], { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', scene:{aspectmode:'cube'}, margin:{t:36,r:0,b:0,l:0}, title:'3D Volume' },
+       { responsive:true, displayModeBar:true });
+    toast("Volume 3D chargé.");
+  }catch(e){ console.error(e); toast("Échec chargement 3D", "error"); }
+  finally{ $("#skel3d").style.display="none"; }
+});
+
+/* =========================
+   Exports
+========================= */
+$$(".exports .btn").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    const fmt = b.dataset.format;
+    const url = endpoints.export(fmt, jobId);
+    const a = document.createElement("a"); a.href = url; a.download = `1dmasw_export.${fmt}`; a.click();
+  });
+});
+
+/* =========================
+   Payments + Invoices
+========================= */
+$("#btnStripe").addEventListener("click", async ()=>{
+  try{
+    const res = await fetch(endpoints.stripe(), { method:"POST", headers:hdr({"Content-Type":"application/json"}), body:JSON.stringify({ product:"FWI Credit", amount:2000 }) });
+    const data = await res.json(); if(!res.ok) throw new Error(data.detail||JSON.stringify(data));
+    window.location.href = data.checkout_url;
+  }catch(e){ console.error(e); toast("Stripe indisponible", "error"); }
+});
+$("#btnPayPal").addEventListener("click", async ()=>{
+  try{
+    const res = await fetch(endpoints.paypal(), { method:"POST", headers:hdr() });
+    const data = await res.json(); if(!res.ok) throw new Error(data.detail||JSON.stringify(data));
+    window.location.href = data.checkout_url;
+  }catch(e){ console.error(e); toast("PayPal indisponible", "error"); }
+});
+$("#btnInvoice").addEventListener("click", ()=>{
+  const id=$("#invoiceId").value.trim(); if(!id) return toast("Saisir l’ID de facture.", "warn");
+  const a=document.createElement("a"); a.href=endpoints.invoice(id); a.download=`invoice_${id}.pdf`; a.click();
+});
+</script>
+</body>
+</html>

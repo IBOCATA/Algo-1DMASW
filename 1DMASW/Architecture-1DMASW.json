@@ -1,0 +1,11 @@
+1dmas1dmasw/
+├── backend/
+│   ├── main.py
+│   ├── tasks.py
+│   ├── inversion/
+│   ├── tests/
+│   └── requirements.txt
+├── docker-compose.yml
+├── README.md
+├── pyproject.toml
+├── pytest.ini

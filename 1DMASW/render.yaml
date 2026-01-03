@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: 1dmasw-api
+    env: docker
+    plan: free
+    repo: https://github.com/ibocata/1dmasw
+    dockerfilePath: ./backend/Dockerfile
+    branch: main
+    autoDeploy: true
+
+  - type: redis
+    name: 1dmasw-redis
+    plan: free
+
+  - type: worker
+    name: 1dmasw-celery-worker
+    env: docker
+    repo: https://github.com/ibocata/1dmasw
+    dockerfilePath: ./backend/Dockerfile
+    startCommand: celery -A tasks worker --loglevel=info
+    autoDeploy: true
+    branch: main
+services:
+  - type: web
+    name: 1DMASW
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
+    envVars:
+      - key: STRIPE_SECRET_KEY
+        value: your_stripe_secret_key
+      - key: PAYPAL_CLIENT_ID
+        value: your_paypal_client_id
+      - key: PAYPAL_CLIENT_SECRET
+        value: your_paypal_client_secret

@@ -1,0 +1,16 @@
+CREATE DATABASE geofon_data;
+\c geofon_data;
+
+CREATE EXTENSION postgis;
+
+CREATE TABLE events (
+    id SERIAL PRIMARY KEY,
+    event_id VARCHAR(50) UNIQUE,
+    time TIMESTAMP,
+    latitude DOUBLE PRECISION,
+    longitude DOUBLE PRECISION,
+    depth DOUBLE PRECISION,
+    magnitude DOUBLE PRECISION,
+    region TEXT,
+    raw_url TEXT
+);

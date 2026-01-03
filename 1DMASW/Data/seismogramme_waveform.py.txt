@@ -1,0 +1,9 @@
+from obspy import UTCDateTime
+from obspy.clients.fdsn import Client
+
+client = Client("GFZ")
+
+t = UTCDateTime("2025-08-01T12:00:00")
+st = client.get_waveforms(network="GR", station="FUR", location="", channel="BH*", starttime=t, endtime=t+60*5)
+
+st.write("waveform_FUR.mseed", format="MSEED")

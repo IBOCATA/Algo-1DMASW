@@ -1,0 +1,11 @@
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --tb=short"
+testpaths = ["backend/tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+markers = [
+    "integration: mark tests as integration",
+    "unit: mark tests as unit tests",
+    "celery: mark celery task tests"
+]

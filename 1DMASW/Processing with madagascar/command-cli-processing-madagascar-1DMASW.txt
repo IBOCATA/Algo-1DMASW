@@ -1,0 +1,2 @@
+segyread read=example.segy tape=example.rsf
+bandpass < example.rsf > filtered.rsf flo=10 fhi=60
